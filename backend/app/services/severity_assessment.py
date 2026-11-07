@@ -54,15 +54,14 @@ _ADAPTIVE_C: int = 3
 """Constant subtracted from mean in adaptive thresholding."""
 
 # Severity score band boundaries
-_LOW_UPPER: float = 33.0
-_MEDIUM_UPPER: float = 60.0
+_LOW_UPPER: float = 30.0
+_MEDIUM_UPPER: float = 55.0
 
 # Weight vector (must sum to 1.0)
-# crack_pixels (40%) replaces old area_ratio (25%) + absolute_size (15%)
-_W_CRACK_PIXELS: float = 0.40
-_W_EDGE: float = 0.25
-_W_DARK: float = 0.20
+_W_CRACK_PIXELS: float = 0.45
+_W_DARK: float = 0.25
 _W_ASPECT: float = 0.15
+_W_EDGE: float = 0.15
 
 
 class SeverityAssessor:
@@ -142,29 +141,28 @@ class SeverityAssessor:
         length_estimate = max(width_px, height_px)
 
         # ── Sub-scores (each normalised to 0-100) ───────────────────────
-        # 1. Crack pixel score (replaces bbox area + size)
-        #    Combines absolute crack pixel count (cap at 2500 px) and density in crop (cap at 30%)
-        count_score = min(crack_pixel_count / 2500.0, 1.0) * 100.0
-        density_score = min(crack_pixel_ratio / 0.30, 1.0) * 100.0
-        pixel_score = 0.60 * count_score + 0.40 * density_score
+        # 1. Crack pixel & width score
+        #    Combines absolute crack pixel count (cap at 1500 px) and estimated width (cap at 3.5 px)
+        count_score = min(crack_pixel_count / 1500.0, 1.0) * 100.0
+        width_score = min(estimated_width / 3.5, 1.0) * 100.0
+        pixel_score = 0.50 * count_score + 0.50 * width_score
 
-        # 2. Edge density — already 0-1; scale directly.
-        edge_score = min(edge_density / 0.60, 1.0) * 100.0
+        # 2. Edge density — scaled to typical underwater range
+        edge_score = min(edge_density / 0.40, 1.0) * 100.0
 
-        # 3. Darkness ratio — already 0-1; scale directly.
-        dark_score = min(darkness_ratio / 0.80, 1.0) * 100.0
+        # 3. Darkness ratio — scaled to typical underwater contrast
+        dark_score = min(darkness_ratio / 0.70, 1.0) * 100.0
 
         # 4. Aspect ratio — 1 = square, higher = more elongated.
-        #    Crack-like elongation starts contributing above 2:1.
-        aspect_score = min((aspect_ratio - 1.0) / 9.0, 1.0) * 100.0
+        aspect_score = min((aspect_ratio - 1.0) / 6.0, 1.0) * 100.0
         aspect_score = max(aspect_score, 0.0)
 
         # ── Weighted composite ───────────────────────────────────────────
         severity_score = (
             _W_CRACK_PIXELS * pixel_score
-            + _W_EDGE * edge_score
             + _W_DARK * dark_score
             + _W_ASPECT * aspect_score
+            + _W_EDGE * edge_score
         )
         severity_score = float(np.clip(severity_score, 0.0, 100.0))
 
