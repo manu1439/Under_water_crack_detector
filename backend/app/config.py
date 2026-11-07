@@ -31,7 +31,7 @@ DEFAULT_IOU = float(os.getenv("AQUAGUARD_DEFAULT_IOU", "0.45"))
 DEVICE = os.getenv("AQUAGUARD_DEVICE", "auto")  # auto, cpu, cuda, 0, 1, ...
 
 # ── Frame extraction settings ────────────────────────────────────────────
-DEFAULT_FRAME_INTERVAL = int(os.getenv("AQUAGUARD_FRAME_INTERVAL", "15"))  # every N frames
+DEFAULT_FRAME_INTERVAL = int(os.getenv("AQUAGUARD_FRAME_INTERVAL", "2"))  # every N frames
 BLUR_THRESHOLD = float(os.getenv("AQUAGUARD_BLUR_THRESHOLD", "20.0"))
 BRIGHTNESS_MIN = float(os.getenv("AQUAGUARD_BRIGHTNESS_MIN", "15.0"))
 BRIGHTNESS_MAX = float(os.getenv("AQUAGUARD_BRIGHTNESS_MAX", "240.0"))

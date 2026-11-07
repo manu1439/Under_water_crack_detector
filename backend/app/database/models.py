@@ -63,13 +63,19 @@ class Inspection(Base):
 
 # ── Engine and session factory ────────────────────────────────────────────
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    connect_args={"timeout": 60.0},
+)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def init_db():
-    """Create all tables."""
+    """Create all tables and configure WAL mode for concurrent access."""
     async with engine.begin() as conn:
+        from sqlalchemy import text
+        await conn.execute(text("PRAGMA journal_mode=WAL;"))
         await conn.run_sync(Base.metadata.create_all)
 
 

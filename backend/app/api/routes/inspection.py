@@ -186,6 +186,11 @@ async def _execute_inspection_task(
         result.report_json_path = str(json_path)
         result.report_pdf_path = str(pdf_path)
 
+        # Sync results.json with report paths
+        results_json_file = output_base / "results.json"
+        with open(results_json_file, "w", encoding="utf-8") as f:
+            json.dump(result.model_dump(), f, indent=2, default=str)
+
         # Update DB record
         async with async_session() as session:
             stmt = select(Inspection).where(Inspection.id == inspection_id)

@@ -21,8 +21,8 @@ export default function NewInspectionPage({ setActiveTab, setSelectedInspectionI
 
   // Inspection Config options
   const [config, setConfig] = useState({
-    frame_interval: 10,
-    process_all_frames: false,
+    frame_interval: 2,
+    process_all_frames: true,
     enhancement_method: 'clahe',
     clahe_clip_limit: 3.0,
     clahe_tile_grid: 8,
@@ -89,7 +89,19 @@ export default function NewInspectionPage({ setActiveTab, setSelectedInspectionI
       setActiveTab('processing');
     } catch (err) {
       console.error('Failed to submit inspection:', err);
-      setError(err.response?.data?.detail || 'Failed to upload and start processing.');
+      let message = 'Failed to upload and start processing.';
+      if (err.response?.data?.detail) {
+        if (typeof err.response.data.detail === 'string') {
+          message = err.response.data.detail;
+        } else if (Array.isArray(err.response.data.detail)) {
+          message = err.response.data.detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+        } else {
+          message = JSON.stringify(err.response.data.detail);
+        }
+      } else if (err.message) {
+        message = err.message;
+      }
+      setError(message);
     } finally {
       setIsUploading(false);
     }
@@ -178,37 +190,28 @@ export default function NewInspectionPage({ setActiveTab, setSelectedInspectionI
             <div className="space-y-2">
               <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
                 <span>Frame Extraction Interval</span>
-                <span className="font-mono text-cyan-400 text-xs">Every {config.frame_interval} frames</span>
+                <span className="font-mono text-cyan-400 text-xs">
+                  {config.frame_interval === 1 ? 'Every single frame (100% coverage)' : `Every ${config.frame_interval} frames`}
+                </span>
               </label>
               <input
                 type="range"
-                min="5"
-                max="120"
-                step="5"
+                min="1"
+                max="60"
+                step="1"
                 value={config.frame_interval}
                 onChange={(e) => setConfig({ ...config, frame_interval: parseInt(e.target.value) })}
                 className="w-full accent-cyan-500"
               />
               <p className="text-[11px] text-slate-400">
-                Lower interval analyzes more frames (slower, higher coverage). Default: 30 (~1 fps).
+                Set to 1 or 2 to analyze every frame in the video.
               </p>
             </div>
 
             {/* Quality Filtering Mode */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-slate-300">Intelligent Quality Filter</label>
+              <label className="text-xs font-medium text-slate-300">Frame Selection Mode</label>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConfig({ ...config, process_all_frames: false })}
-                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-all ${
-                    !config.process_all_frames 
-                      ? 'bg-cyan-950 border-cyan-500 text-cyan-300' 
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Filter Blurry/Dark (Recommended)
-                </button>
                 <button
                   type="button"
                   onClick={() => setConfig({ ...config, process_all_frames: true })}
@@ -218,10 +221,21 @@ export default function NewInspectionPage({ setActiveTab, setSelectedInspectionI
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
-                  All Frames
+                  Analyze All Frames (Recommended)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfig({ ...config, process_all_frames: false })}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-all ${
+                    !config.process_all_frames 
+                      ? 'bg-cyan-950 border-cyan-500 text-cyan-300' 
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Filter Blurry/Dark
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400">Rejects frames with Laplacian blur, darkness, or duplicates.</p>
+              <p className="text-[11px] text-slate-400">"Analyze All Frames" guarantees no frames are skipped.</p>
             </div>
 
             {/* Enhancement Method */}

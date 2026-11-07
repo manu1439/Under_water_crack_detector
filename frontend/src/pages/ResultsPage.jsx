@@ -82,12 +82,14 @@ export default function ResultsPage({ inspectionId, setActiveTab }) {
   // Flatten all detections with frame context for table
   const allDetectionsList = [];
   frame_results.forEach((fr, fIdx) => {
-    (fr.detections || []).forEach((d) => {
+    (fr.detections || []).forEach((d, dIdx) => {
       allDetectionsList.push({
         ...d,
         frame_number: fr.frame_number,
         timestamp: fr.timestamp,
         frameIndex: fIdx,
+        defectNumber: dIdx + 1,
+        totalInFrame: fr.detections.length,
       });
     });
   });
@@ -109,6 +111,12 @@ export default function ResultsPage({ inspectionId, setActiveTab }) {
     setHighlightedDetectionId(det.detection.detection_id);
     setSelectedFrameIndex(det.frameIndex);
     setActiveTabMode('annotated');
+    setTimeout(() => {
+      const card = document.getElementById(`defect-card-${det.detection.detection_id}`);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 150);
   };
 
   return (
@@ -350,16 +358,17 @@ export default function ResultsPage({ inspectionId, setActiveTab }) {
             </h2>
 
             {currentFrame && currentFrame.detections?.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[520px] overflow-y-auto pr-1">
                 {currentFrame.detections.map((dr, i) => {
                   const isHighlighted = highlightedDetectionId === dr.detection.detection_id;
                   const sev = dr.severity;
                   return (
                     <div
+                      id={`defect-card-${dr.detection.detection_id}`}
                       key={dr.detection.detection_id}
                       className={`p-4 rounded-xl border transition-all ${
                         isHighlighted
-                          ? 'bg-cyan-950/50 border-cyan-400 shadow-md ring-1 ring-cyan-500'
+                          ? 'bg-cyan-950/60 border-cyan-400 shadow-lg ring-2 ring-cyan-500 scale-[1.01]'
                           : 'bg-slate-900/60 border-slate-800'
                       }`}
                     >
@@ -455,7 +464,14 @@ export default function ResultsPage({ inspectionId, setActiveTab }) {
                           : 'hover:bg-slate-800/40'
                       }`}
                     >
-                      <td className="px-5 py-3 font-mono font-medium">#{det.frame_number}</td>
+                      <td className="px-5 py-3 font-mono font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">#{det.frame_number}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-cyan-300 font-sans border border-slate-700">
+                            Crack #{det.defectNumber} of {det.totalInFrame}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-5 py-3 font-mono">{det.timestamp.toFixed(2)}s</td>
                       <td className="px-5 py-3 font-mono font-bold text-slate-200">
                         {(det.detection.confidence * 100).toFixed(1)}%

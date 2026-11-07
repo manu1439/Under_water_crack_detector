@@ -108,11 +108,11 @@ class FrameResult(BaseModel):
 # ── Inspection ────────────────────────────────────────────────────────────
 
 class InspectionConfig(BaseModel):
-    frame_interval: int = 30
+    frame_interval: int = 2
     enhancement_method: EnhancementMethod = EnhancementMethod.CLAHE
     confidence_threshold: float = 0.25
     iou_threshold: float = 0.45
-    process_all_frames: bool = False
+    process_all_frames: bool = True
     clahe_clip_limit: float = 3.0
     clahe_tile_grid: int = 8
     gamma_value: float = 1.5
