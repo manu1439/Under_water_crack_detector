@@ -4,6 +4,17 @@ echo ============================================================
 echo   AquaGuard AI - YOLO26 Underwater Crack Detector Training
 echo ============================================================
 echo.
+
+set PYTHON_CMD=python
+if exist "aquaguard_env\Scripts\python.exe" (
+    set PYTHON_CMD=aquaguard_env\Scripts\python.exe
+) else if exist ".venv\Scripts\python.exe" (
+    set PYTHON_CMD=.venv\Scripts\python.exe
+) else if exist "venv\Scripts\python.exe" (
+    set PYTHON_CMD=venv\Scripts\python.exe
+)
+
+echo Using Python interpreter: %PYTHON_CMD%
 echo Dataset: 11,460 train images, 368 valid images (1 class: crack)
 echo Architecture: YOLO26 Nano (yolo26n.pt)
 echo Output Path:  models\best.pt
@@ -16,7 +27,7 @@ if "%BATCH%"=="" set BATCH=16
 
 echo.
 echo Starting training: %EPOCHS% epochs, batch size %BATCH%...
-.\aquaguard_env\Scripts\python.exe backend\training\train.py --model yolo26n.pt --epochs %EPOCHS% --batch %BATCH% --device auto
+%PYTHON_CMD% backend\training\train.py --model yolo26n.pt --epochs %EPOCHS% --batch %BATCH% --device auto
 echo.
 echo Training complete. Checking weights...
 dir models\best.pt
