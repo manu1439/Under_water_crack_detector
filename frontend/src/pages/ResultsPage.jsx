@@ -290,7 +290,7 @@ export default function ResultsPage({ inspectionId, setActiveTab }) {
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Original Raw Frame</span>
                     <div className="border border-slate-800 rounded-lg overflow-hidden bg-black/40">
                       <img
-                        src={`/api/inspection/${summary.inspection_id}/static/selected/${currentFrame.original_path.split(/[\\/]/).pop()}`}
+                        src={`/api/inspection/${summary.inspection_id}/static/${currentFrame.original_path && currentFrame.original_path.includes('selected') ? 'selected' : 'extracted'}/${currentFrame.original_path ? currentFrame.original_path.split(/[\\/]/).pop() : ''}`}
                         alt="Original"
                         className="max-h-72 w-full object-contain"
                       />

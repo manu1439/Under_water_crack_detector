@@ -431,13 +431,22 @@ async def get_frame_image(
     filename: str,
 ):
     """
-    Serve static frame images (extracted, selected, enhanced, annotated).
+    Serve static frame images (extracted, selected, enhanced, annotated, original).
     """
-    allowed_categories = {"extracted", "selected", "enhanced", "annotated"}
+    allowed_categories = {"extracted", "selected", "enhanced", "annotated", "original"}
     if category not in allowed_categories:
         raise HTTPException(status_code=400, detail="Invalid frame category.")
 
     file_path = OUTPUT_DIR / inspection_id / category / filename
+
+    # Robust fallback for original/raw frames across extracted vs selected
+    if not file_path.exists():
+        for alt_folder in ["extracted", "selected", "enhanced"]:
+            alt_path = OUTPUT_DIR / inspection_id / alt_folder / filename
+            if alt_path.exists():
+                file_path = alt_path
+                break
+
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Image file not found.")
 
