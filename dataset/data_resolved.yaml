@@ -1,0 +1,7 @@
+names:
+- crack
+nc: 1
+path: C:/majorproj/dataset
+test: test/images
+train: train/images
+val: valid/images

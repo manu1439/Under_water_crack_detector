@@ -1,0 +1,34 @@
+{
+  "base_model": "yolo26n.pt",
+  "epochs": 30,
+  "batch_size": 16,
+  "img_size": 640,
+  "device": "0",
+  "dataset_stats": {
+    "classes": [
+      "crack"
+    ],
+    "num_classes": 1,
+    "splits": {
+      "train": {
+        "images": 11460,
+        "labels": 11460,
+        "annotations": 25278,
+        "corrupt_labels": 0
+      },
+      "valid": {
+        "images": 368,
+        "labels": 368,
+        "annotations": 808,
+        "corrupt_labels": 0
+      },
+      "test": {
+        "images": 184,
+        "labels": 184,
+        "annotations": 368,
+        "corrupt_labels": 0
+      }
+    }
+  },
+  "weights_path": "C:\\majorproj\\models\\best.pt"
+}

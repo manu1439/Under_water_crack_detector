@@ -1,0 +1,31 @@
+# AquaGuard AI — Backend Dependencies
+# Core
+fastapi>=0.162.0
+uvicorn>=0.54.0
+python-multipart>=0.0.33
+python-dotenv>=1.2.0
+pydantic>=2.14.0
+aiofiles>=25.1.0
+
+# Database
+sqlalchemy>=2.1.0
+aiosqlite>=0.22.0
+greenlet>=3.1.0
+
+# Computer Vision & ML
+opencv-python>=5.0.0
+numpy>=2.4.0
+Pillow>=13.0.0
+torch>=2.15.0
+torchvision>=0.29.0
+ultralytics>=8.4.200
+
+# Image Processing
+imagehash>=4.3.0
+
+# Reporting
+fpdf2>=2.9.0
+
+# Scientific
+scipy>=1.17.0
+PyWavelets>=1.9.0

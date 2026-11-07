@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  aquaguard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aquaguard-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./dataset:/app/dataset
+      - ./backend/uploads:/app/backend/uploads
+      - ./backend/outputs:/app/backend/outputs
+    environment:
+      - AQUAGUARD_API_HOST=0.0.0.0
+      - AQUAGUARD_API_PORT=8000
+      - AQUAGUARD_DEVICE=auto
+    restart: unless-stopped
