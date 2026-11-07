@@ -312,12 +312,17 @@ export default function ResultsPage({ inspectionId, setActiveTab }) {
               )}
 
               {activeTabMode === 'video' && data.annotated_video_path && (
-                <div className="w-full flex justify-center">
+                <div className="w-full flex justify-center bg-black/60 rounded-lg p-2">
                   <video
+                    key={summary.inspection_id}
                     src={inspectionService.getVideoUrl(summary.inspection_id)}
                     controls
-                    className="max-h-[460px] w-full rounded-lg border border-slate-800"
-                  />
+                    preload="auto"
+                    playsInline
+                    className="max-h-[460px] w-full rounded-lg border border-slate-800 shadow-xl"
+                  >
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
               )}
             </div>

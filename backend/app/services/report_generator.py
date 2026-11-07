@@ -5,6 +5,7 @@ Generates comprehensive inspection reports in both JSON and PDF formats.
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 from datetime import datetime
@@ -64,6 +65,51 @@ class ReportGenerator:
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(result.model_dump(), f, indent=2, default=str)
         logger.info(f"JSON report saved: {file_path}")
+        return file_path
+
+    def generate_csv_report(self, result: InspectionResultFull) -> Path:
+        """Export inspection detections as a clean CSV spreadsheet."""
+        file_path = self.output_dir / "report.csv"
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            # Metadata header
+            writer.writerow(["# AquaGuard AI - Inspection Telemetry Export"])
+            writer.writerow(["# Inspection ID", result.summary.inspection_id])
+            writer.writerow(["# Target File", result.summary.filename])
+            writer.writerow(["# Total Detections", result.summary.total_detections])
+            writer.writerow([])
+            # Column headers
+            writer.writerow([
+                "Frame Number",
+                "Timestamp (s)",
+                "Crack Index",
+                "Confidence (%)",
+                "Severity Level",
+                "Severity Score",
+                "Width (px)",
+                "Height (px)",
+                "Bounding Box [x1, y1, x2, y2]",
+                "Physical Diagnostic Reasons"
+            ])
+            for fr in result.frame_results:
+                for idx, dr in enumerate(fr.detections, 1):
+                    bbox = dr.detection.bbox
+                    w = round(abs(bbox.x2 - bbox.x1), 1)
+                    h = round(abs(bbox.y2 - bbox.y1), 1)
+                    reasons = " | ".join(dr.severity.reasons)
+                    writer.writerow([
+                        fr.frame_number,
+                        round(fr.timestamp, 2),
+                        idx,
+                        round(dr.detection.confidence * 100, 1),
+                        dr.severity.severity.value,
+                        round(dr.severity.severity_score, 1),
+                        w,
+                        h,
+                        f"[{bbox.x1:.1f}, {bbox.y1:.1f}, {bbox.x2:.1f}, {bbox.y2:.1f}]",
+                        reasons
+                    ])
+        logger.info(f"CSV report saved: {file_path}")
         return file_path
 
     def generate_pdf_report(

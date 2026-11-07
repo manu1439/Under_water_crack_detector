@@ -12,6 +12,7 @@ venv/
 # Ultralytics & PyTorch
 runs/
 *.pt
+*.cache
 
 # Application outputs & uploads (large video data)
 backend/uploads/*

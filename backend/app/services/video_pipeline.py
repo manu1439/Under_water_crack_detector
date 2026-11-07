@@ -522,7 +522,7 @@ class VideoPipeline:
     def _generate_annotated_video(
         self, frame_paths: list[Path], output_path: Path, fps: float
     ):
-        """Compile annotated frames into a video."""
+        """Compile annotated frames into a browser-compatible H.264 video."""
         frame_paths = sorted(frame_paths)
         if not frame_paths:
             return
@@ -532,8 +532,10 @@ class VideoPipeline:
             return
 
         h, w = first.shape[:2]
+        fps_clamped = min(fps, 10.0)
+        temp_path = output_path.with_name(f"temp_raw_{output_path.name}")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out = cv2.VideoWriter(str(output_path), fourcc, min(fps, 10.0), (w, h))
+        out = cv2.VideoWriter(str(temp_path), fourcc, fps_clamped, (w, h))
 
         for fp in frame_paths:
             frame = cv2.imread(str(fp))
@@ -543,7 +545,34 @@ class VideoPipeline:
                 out.write(frame)
 
         out.release()
-        logger.info(f"Annotated video saved: {output_path}")
+
+        # Convert to web-standard H.264 (AVC1) + YUV420P + faststart
+        converted = False
+        try:
+            import subprocess
+            import imageio_ffmpeg
+            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+            cmd = [
+                ffmpeg_exe,
+                "-y",
+                "-i", str(temp_path),
+                "-c:v", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                str(output_path),
+            ]
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            converted = True
+            logger.info(f"Web-compatible H.264 annotated video saved: {output_path}")
+        except Exception as e:
+            logger.warning(f"Could not convert video via ffmpeg: {e}")
+
+        if converted and temp_path.exists():
+            temp_path.unlink()
+        elif not converted and temp_path.exists():
+            if output_path.exists():
+                output_path.unlink()
+            temp_path.rename(output_path)
 
 
 # ── Async entry point ─────────────────────────────────────────────────────

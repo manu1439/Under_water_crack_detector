@@ -392,7 +392,7 @@ async def get_annotated_video(
     return FileResponse(
         str(video_path),
         media_type="video/mp4",
-        filename=f"annotated_{insp.filename}",
+        content_disposition_type="inline",
     )
 
 
