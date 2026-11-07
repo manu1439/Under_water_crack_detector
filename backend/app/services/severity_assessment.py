@@ -46,16 +46,23 @@ _CANNY_LOW: int = 50
 _CANNY_HIGH: int = 150
 """Upper hysteresis threshold for Canny edge detection."""
 
+# Adaptive thresholding for crack pixel segmentation
+_ADAPTIVE_BLOCK_SIZE: int = 15
+"""Block size for local adaptive thresholding (must be odd)."""
+
+_ADAPTIVE_C: int = 3
+"""Constant subtracted from mean in adaptive thresholding."""
+
 # Severity score band boundaries
 _LOW_UPPER: float = 33.0
 _MEDIUM_UPPER: float = 60.0
 
 # Weight vector (must sum to 1.0)
-_W_AREA: float = 0.25
+# crack_pixels (40%) replaces old area_ratio (25%) + absolute_size (15%)
+_W_CRACK_PIXELS: float = 0.40
 _W_EDGE: float = 0.25
 _W_DARK: float = 0.20
 _W_ASPECT: float = 0.15
-_W_SIZE: float = 0.15
 
 
 class SeverityAssessor:
@@ -66,11 +73,10 @@ class SeverityAssessor:
     in the range [0, 100].
 
     The score is a weighted combination of:
-        • **crack_area_ratio** (25 %) — fraction of image area occupied.
+        • **crack_pixel_count** (40 %) — segmented crack pixel count and density.
         • **edge_density** (25 %) — ratio of Canny edge pixels in the crop.
         • **darkness_ratio** (20 %) — fraction of dark pixels (< threshold).
         • **aspect_ratio** (15 %) — elongation of the bounding box.
-        • **absolute_size** (15 %) — raw pixel dimensions of the box.
 
     Severity categories:
         • 0–33   → LOW
@@ -127,6 +133,7 @@ class SeverityAssessor:
         aspect_ratio = self._calculate_aspect_ratio(bbox)
         edge_density = self._analyze_edge_density(crop)
         darkness_ratio = self._analyze_darkness(crop, threshold=_DARKNESS_THRESHOLD)
+        crack_pixel_count, crack_pixel_ratio, estimated_width = self._segment_crack_pixels(crop)
 
         bbox_w = abs(bbox.x2 - bbox.x1)
         bbox_h = abs(bbox.y2 - bbox.y1)
@@ -135,8 +142,11 @@ class SeverityAssessor:
         length_estimate = max(width_px, height_px)
 
         # ── Sub-scores (each normalised to 0-100) ───────────────────────
-        # 1. Area ratio — cap contribution at 20 % of image area.
-        area_score = min(area_ratio / 0.20, 1.0) * 100.0
+        # 1. Crack pixel score (replaces bbox area + size)
+        #    Combines absolute crack pixel count (cap at 2500 px) and density in crop (cap at 30%)
+        count_score = min(crack_pixel_count / 2500.0, 1.0) * 100.0
+        density_score = min(crack_pixel_ratio / 0.30, 1.0) * 100.0
+        pixel_score = 0.60 * count_score + 0.40 * density_score
 
         # 2. Edge density — already 0-1; scale directly.
         edge_score = min(edge_density / 0.60, 1.0) * 100.0
@@ -149,17 +159,12 @@ class SeverityAssessor:
         aspect_score = min((aspect_ratio - 1.0) / 9.0, 1.0) * 100.0
         aspect_score = max(aspect_score, 0.0)
 
-        # 5. Absolute size — use the diagonal of the bbox, cap at 500 px.
-        diagonal = float(np.sqrt(bbox_w ** 2 + bbox_h ** 2))
-        size_score = min(diagonal / 500.0, 1.0) * 100.0
-
         # ── Weighted composite ───────────────────────────────────────────
         severity_score = (
-            _W_AREA * area_score
+            _W_CRACK_PIXELS * pixel_score
             + _W_EDGE * edge_score
             + _W_DARK * dark_score
             + _W_ASPECT * aspect_score
-            + _W_SIZE * size_score
         )
         severity_score = float(np.clip(severity_score, 0.0, 100.0))
 
@@ -172,18 +177,21 @@ class SeverityAssessor:
             aspect_ratio=aspect_ratio,
             width_px=width_px,
             height_px=height_px,
+            crack_pixels=crack_pixel_count,
+            estimated_width=estimated_width,
         )
 
         logger.debug(
             "Severity assessment: score=%.1f level=%s  "
-            "(area=%.3f edge=%.3f dark=%.3f ar=%.2f diag=%.0f)",
+            "(crack_px=%d px_ratio=%.3f edge=%.3f dark=%.3f ar=%.2f est_w=%.1f)",
             severity_score,
             severity_level.value,
-            area_ratio,
+            crack_pixel_count,
+            crack_pixel_ratio,
             edge_density,
             darkness_ratio,
             aspect_ratio,
-            diagonal,
+            estimated_width,
         )
 
         return SeverityAssessment(
@@ -257,6 +265,75 @@ class SeverityAssessor:
             return None
 
         return image[y1:y2, x1:x2].copy()
+
+    def _segment_crack_pixels(self, crop: np.ndarray) -> tuple[int, float, float]:
+        """Segment and count the actual foreground crack pixels inside *crop*.
+
+        Uses local adaptive thresholding and morphological filtering to isolate
+        the dark crack fissure from concrete background texture.
+
+        Returns
+        -------
+        tuple[int, float, float]
+            - crack_pixel_count: total active crack pixels
+            - crack_pixel_ratio: crack pixels / total crop pixels
+            - estimated_width: estimated average crack thickness (px)
+        """
+        if crop.size == 0:
+            return 0, 0.0, 0.0
+
+        gray = (
+            cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            if len(crop.shape) == 3
+            else crop
+        )
+        h, w = gray.shape[:2]
+        total_pixels = h * w
+        if total_pixels == 0:
+            return 0, 0.0, 0.0
+
+        # Gaussian blur to suppress camera noise and fine water particulates
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+
+        # Dynamic block size for adaptive thresholding (must be odd and <= min dimension)
+        min_dim = min(h, w)
+        block_size = _ADAPTIVE_BLOCK_SIZE
+        if block_size >= min_dim:
+            block_size = max(3, (min_dim // 2) * 2 - 1)
+
+        # Adaptive thresholding (extracts darker crack lines as foreground 255)
+        thresh = cv2.adaptiveThreshold(
+            blurred,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV,
+            block_size,
+            _ADAPTIVE_C,
+        )
+
+        # Morphological opening to eliminate isolated single-pixel noise
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        clean_mask = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
+        # Filter out tiny disconnected specks (< 8 pixels)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(clean_mask, connectivity=8)
+        filtered_mask = np.zeros_like(clean_mask)
+        for label in range(1, num_labels):
+            area = stats[label, cv2.CC_STAT_AREA]
+            if area >= 8:
+                filtered_mask[labels == label] = 255
+
+        # If connected component filter removed everything (e.g. faint hairline), use clean_mask
+        final_mask = filtered_mask if np.count_nonzero(filtered_mask) > 0 else clean_mask
+
+        crack_pixels = int(np.count_nonzero(final_mask))
+        crack_pixel_ratio = float(crack_pixels / total_pixels)
+
+        # Estimated average crack width along the longer axis
+        length_estimate = max(h, w)
+        estimated_width = float(round(crack_pixels / max(length_estimate, 1), 1))
+
+        return crack_pixels, crack_pixel_ratio, estimated_width
 
     def _analyze_edge_density(self, crop: np.ndarray) -> float:
         """Return the fraction of edge pixels in *crop* via Canny detection.
@@ -412,6 +489,8 @@ class SeverityAssessor:
         aspect_ratio: float,
         width_px: int,
         height_px: int,
+        crack_pixels: int = 0,
+        estimated_width: float = 0.0,
     ) -> list[str]:
         """Generate human-readable sentences explaining the severity rating.
 
@@ -434,6 +513,10 @@ class SeverityAssessor:
             Bounding-box width in pixels.
         height_px:
             Bounding-box height in pixels.
+        crack_pixels:
+            Segmented crack foreground pixel count.
+        estimated_width:
+            Estimated average crack width in pixels.
 
         Returns
         -------
@@ -441,6 +524,15 @@ class SeverityAssessor:
             Ordered list of descriptive reason strings.
         """
         reasons: list[str] = []
+
+        # ── Crack pixel count & width ────────────────────────────────────
+        if crack_pixels > 0:
+            reasons.append(
+                f"Segmented crack area contains {crack_pixels:,} active fracture pixels "
+                f"with an estimated average width of {estimated_width:.1f} px."
+            )
+        else:
+            reasons.append("Segmented crack area shows a hairline fracture pattern.")
 
         # ── Area ratio ───────────────────────────────────────────────────
         area_pct = area_ratio * 100.0
