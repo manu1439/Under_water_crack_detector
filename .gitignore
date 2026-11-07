@@ -25,6 +25,8 @@ backend/outputs/*
 node_modules/
 frontend/node_modules/
 frontend/dist/
+.vite/
+frontend/.vite/
 .DS_Store
 
 # Environment
